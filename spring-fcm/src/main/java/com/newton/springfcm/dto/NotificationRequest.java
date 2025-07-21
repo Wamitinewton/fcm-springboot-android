@@ -10,4 +10,5 @@ public class NotificationRequest {
     private String body;
     private String topic;
     private String token;
+    private String imageUrl;
 }
