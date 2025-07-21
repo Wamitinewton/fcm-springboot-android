@@ -1,13 +1,17 @@
 package com.newton.fcm_client
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,8 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.newton.fcm_client.ui.theme.FcmclientTheme
 import kotlinx.coroutines.launch
@@ -46,9 +50,22 @@ import kotlinx.coroutines.tasks.await
 class MainActivity : ComponentActivity() {
     private val TAG = "FCM_CLIENT"
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d(TAG, "Notification permission granted")
+        } else {
+            Log.w(TAG, "Notification permission denied")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        requestNotificationPermission()
+
         setContent {
             FcmclientTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -56,6 +73,22 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding),
                         onTokenFetch = { fetchFCMToken() }
                     )
+                }
+            }
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    Log.d(TAG, "Notification permission already granted")
+                }
+                else -> {
+                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
         }
@@ -84,7 +117,6 @@ fun FCMTokenScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Fetch token on first composition
     LaunchedEffect(Unit) {
         isLoading = true
         error = null
@@ -137,7 +169,6 @@ fun FCMTokenScreen(
             }
         }
 
-        // Token display
         token?.let { fcmToken ->
             Card(
                 modifier = Modifier.fillMaxWidth()
@@ -174,7 +205,6 @@ fun FCMTokenScreen(
             }
         }
 
-        // Refresh button
         OutlinedButton(
             onClick = {
                 coroutineScope.launch {
@@ -204,16 +234,4 @@ private fun copyToClipboard(context: Context, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val clip = ClipData.newPlainText("FCM Token", text)
     clipboard.setPrimaryClip(clip)
-}
-
-@Preview(showBackground = true)
-@Composable
-fun FCMTokenScreenPreview() {
-    FcmclientTheme {
-        FCMTokenScreen(
-            onTokenFetch = {
-                "fakeTokenForPreviewPurposes123456789abcdefghijklmnopqrstuvwxyz"
-            }
-        )
-    }
 }
